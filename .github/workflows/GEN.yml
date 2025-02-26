@@ -1,31 +1,49 @@
 name: GENERATE APK
 
 on:
-  #  push:
-  #    branches:
-  #      - main
-  #  pull_request:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Build With Gradle
+
+      - name: Setup Java 15
+        uses: actions/setup-java@v3
+        with:
+          java-version: 15
+          distribution: temurin
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
         run: |
-          chmod +x gradlew
-          ./gradlew assemblerelease --build-cache --parallel --daemon --warning-mode all
-      - name: Prepare App
+          ./gradlew assembleRelease \
+            --build-cache \
+            --parallel \
+            --daemon \
+            --warning-mode all \
+            --refresh-dependencies  # 清理依赖缓存
+
+      - name: Prepare APK files
         run: |
           mkdir -p ${{ github.workspace }}/apk/
-          for file in `find ~ -name "*.apk" -print`; do
-            mv "$file" ${{ github.workspace }}/apk/
-          done
-      - name: Upload App To Artifact
+          find . -type f -name "*.apk" -print0 | xargs -0 -I {} mv {} ${{ github.workspace }}/apk/
+
+      - name: Upload APK to Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: box
+          name: app-release-apk
           path: ${{ github.workspace }}/apk/*
+          retention-days: 1  # 保留1天
